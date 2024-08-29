@@ -22,7 +22,7 @@ public struct KeychainKeypair {
     self.secureEnclave = secureEnclave
   }
   
-  public init(prv: KeychainRecord.Label, pub: KeychainRecord.Label, secureEnclave: Bool = true) {
+  public init(prv: String, pub: String, secureEnclave: Bool = true) {
     self.prv = .key(key: nil, label: prv)
     self.pub = .key(key: nil, label: pub)
     self.secureEnclave = secureEnclave
@@ -38,12 +38,10 @@ public struct KeychainKeypair {
 }
 
 public enum KeychainRecord {
-  public typealias Label = String
-  public typealias Account = String
-  case data(data: DataConvertible?, label: Label?, account: Account?)
-  case key(key: SecKey?, label: Label?)
+  case data(data: Data?, label: String?, account: String?)
+  case key(key: SecKey?, label: String?)
   
-  public var label: Label? {
+  public var label: String? {
     switch self {
     case let .key(_, label):
       return label
@@ -52,7 +50,7 @@ public enum KeychainRecord {
     }
   }
   
-  public var account: Account? {
+  public var account: String? {
     switch self {
     case .key:
       return nil
@@ -72,14 +70,7 @@ public enum KeychainRecord {
     guard case let .data(data, _, _) = self else {
       return nil
     }
-    return data?._data
-  }
-  
-  public func value<T>() -> T? {
-    guard case let .data(data, _, _) = self else {
-      return nil
-    }
-    return (data as? ValueConvertible)?._value()
+    return data
   }
   
   public func withUpdated(data: Data) -> KeychainRecord? {
