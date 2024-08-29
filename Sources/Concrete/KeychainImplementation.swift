@@ -9,10 +9,10 @@
 import Foundation
 import LocalAuthentication
 
-public final class KeychainImplementation: Keychain {
-  public let accessGroup: Keychain.AccessGroup?
+public class KeychainImplementation: Keychain {
+  public let accessGroup: String?
   
-  public init(accessGroup: Keychain.AccessGroup?) {
+  public init(accessGroup: String?) {
     self.accessGroup = accessGroup
   }
   
@@ -27,7 +27,7 @@ public final class KeychainImplementation: Keychain {
     } catch KeychainQueryError.missingEntitlement {
       throw KeychainError.general(message: "Couldn't save record. Missing entitlement.")
     } catch KeychainQueryError.duplicateItem {
-      throw KeychainError.duplicateItem(message: "Couldn't save record. Duplicate item.")
+      throw KeychainError.general(message: "Couldn't save record. Duplicate item.")
     } catch let KeychainQueryError.other(status: status) {
       throw KeychainError.general(message: "Couldn't save record. OSStatus: \(status). Record: \(record)")
     }
@@ -38,26 +38,22 @@ public final class KeychainImplementation: Keychain {
       throw KeychainError.general(message: "Couldn't update record. Not supported.")
     }
     do {
-      // Try save first
+      try self.validateNotFound(record: record, context: nil)
       try self.save(record)
-    } catch KeychainError.duplicateItem {
-      // Override record
-      let query = try KeychainQueryFactory.update(record, accessGroup: self.accessGroup)
-      do {
-        try query.execute().get()
-      } catch KeychainQueryError.invalidRecord {
-        throw KeychainError.general(message: "Couldn't update record. It's possible that the access control you have provided isn't supported on this OS and/or hardware.")
-      } catch KeychainQueryError.missingEntitlement {
-        throw KeychainError.general(message: "Couldn't update record. Missing entitlement.")
-      } catch KeychainQueryError.duplicateItem {
-        throw KeychainError.duplicateItem(message: "Couldn't update record. Duplicate item.")
-      } catch let KeychainQueryError.other(status: status) {
-        throw KeychainError.general(message: "Couldn't update record. OSStatus: \(status). Record: \(record)")
-      } catch KeychainQueryError.notFound {
-        throw KeychainError.notFound(message: "Couldn't get data for record: \(record)")
-      } catch {
-        throw error
-      }
+      return
+    } catch {}
+    
+    let query = try KeychainQueryFactory.update(record, accessGroup: self.accessGroup)
+    do {
+      try query.execute().get()
+    } catch KeychainQueryError.invalidRecord {
+      throw KeychainError.general(message: "Couldn't update record. It's possible that the access control you have provided isn't supported on this OS and/or hardware.")
+    } catch KeychainQueryError.missingEntitlement {
+      throw KeychainError.general(message: "Couldn't update record. Missing entitlement.")
+    } catch KeychainQueryError.duplicateItem {
+      throw KeychainError.general(message: "Couldn't update record. Duplicate item.")
+    } catch let KeychainQueryError.other(status: status) {
+      throw KeychainError.general(message: "Couldn't update record. OSStatus: \(status). Record: \(record)")
     }
   }
   
@@ -226,8 +222,8 @@ public final class KeychainImplementation: Keychain {
 
     // Generate temporary keypair
     var tempKeys = KeychainKeypair(prv: "\(keys.prv.label ?? "<unset>")-change",
-                                   pub: "\(keys.pub.label ?? "<unset>")-change",
-                                   secureEnclave: true)
+                                    pub: "\(keys.pub.label ?? "<unset>")-change",
+                                    secureEnclave: true)
     try? self.delete(tempKeys.prv)
     try? self.delete(tempKeys.pub)
     tempKeys = try self.generate(keys: tempKeys, context: newContext)
@@ -299,9 +295,9 @@ public final class KeychainImplementation: Keychain {
       _ = try loadQuery.execute().get()
       switch record {
       case let .data(_, label, account):
-        throw KeychainError.duplicateItem(message: "Duplicate item. Label: \(label ?? "<emtpy>"). Account: \(account ?? "<empty>")")
+        throw KeychainError.general(message: "Duplicate item. Label: \(label ?? "<emtpy>"). Account: \(account ?? "<empty>")")
       case let .key(_, label: label):
-        throw KeychainError.duplicateItem(message: "Duplicate key. Label: \(label ?? "<empty>")")
+        throw KeychainError.general(message: "Duplicate key. Label: \(label ?? "<empty>")")
       }
     } catch KeychainQueryError.notFound {
     } catch {
